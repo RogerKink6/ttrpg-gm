@@ -15,7 +15,7 @@ export type EntityType =
 
 export type AttributState =
   | 'INDEFINI'      // Never observed, pure potential
-  | 'CONTRAINT';    // Partially determined by inference
+  | 'CONTRAINT'     // Partially determined by inference
   | 'FIGE';         // Canonically observed, immutable
 
 // ==================== ENTITY INTERFACE ====================
@@ -284,9 +284,9 @@ export type DeclencheurObservation =
 export interface OptionsCollapse {
   profondeur: 'MINIMALE' | 'STANDARD' | 'DETAILLEE';
   registre: 'NEUTRE' | 'DRAMATIQUE' | 'HUMORISTIQUE' | 'SOMBRE';
-  timeoutMs: number;
-  maxTentatives: number;
-  accepterPartiel: boolean;
+  timeoutMs?: number;
+  maxTentatives?: number;
+  accepterPartiel?: boolean;
 }
 
 export interface ResultatCollapse {
@@ -325,7 +325,7 @@ export class RegistreCanonique {
     attribut: string,
     valeur: AttributValue,
     observation: AttributFige['observation']
-  ): { succes: boolean; faitId?: string } {
+  ): { succes: boolean; faitId?: string; raison?: string } {
 
     const cle = `${entiteId}:${attribut}`;
 
@@ -338,7 +338,8 @@ export class RegistreCanonique {
     const fait: AttributFige = {
       cle: attribut,
       valeur,
-      observation
+      observation,
+      preuves: []
     };
 
     // Store
@@ -403,6 +404,16 @@ export class ChampPotentialites {
   getPotentialite(entiteId: string, attribut: string): Potentialite | null {
     const cle = `${entiteId}:${attribut}`;
     return this.potentialites.get(cle) || null;
+  }
+
+  getTousPotentialites(entiteId: string): Potentialite[] {
+    const result: Potentialite[] = [];
+    for (const potentialite of this.potentialites.values()) {
+      if (potentialite.entiteId === entiteId) {
+        result.push(potentialite);
+      }
+    }
+    return result;
   }
 
   convertirEnFige(entiteId: string, attribut: string): void {
@@ -500,19 +511,29 @@ export class MoteurCollapse {
     // 3. For now, simulate collapse (in real implementation, call LLM here)
     // This is where the AI would generate the value based on constraints
 
-    // 4. Create fait from generation
+    // 4. Convert DemandeCollapse observation to AttributFige observation
+    const observationFige: AttributFige['observation'] = {
+      timestamp: demande.observation.timestamp,
+      lieu: demande.observation.lieu,
+      methode: 'DIALOGUE_DIRECT', // Default mapping from trigger
+      source: { type: 'OBSERVATION_DIRECTE' },
+      fiabilite: 'CERTAINE'
+    };
+
+    // 5. Create fait from generation
     const fait: AttributFige = {
       cle: demande.attribut,
       valeur: { type: 'STRING', valeur: 'Generated value' }, // Placeholder
-      observation: demande.observation
+      observation: observationFige,
+      preuves: []
     };
 
-    // 5. Inscrire dans RC
+    // 6. Inscrire dans RC
     const inscription = this.rc.inscrireFait(
       demande.entiteId,
       demande.attribut,
       fait.valeur,
-      demande.observation
+      observationFige
     );
 
     if (!inscription.succes) {
@@ -525,10 +546,10 @@ export class MoteurCollapse {
       };
     }
 
-    // 6. Retirer du CP
+    // 7. Retirer du CP
     this.cp.convertirEnFige(demande.entiteId, demande.attribut);
 
-    // 7. Propager les contraintes
+    // 8. Propager les contraintes
     const propagation = this.propagerContraintes(fait);
 
     return {
@@ -548,7 +569,7 @@ export class MoteurCollapse {
 
     for (const voisin of voisins) {
       // Get potentialities for this neighbor
-      const potentialitesVoisin = this.cp.getTousFaits(voisin.entiteId);
+      const potentialitesVoisin = this.cp.getTousPotentialites(voisin.entiteId);
 
       // Add constraints based on relation type
       const arete = this.gcn.getArete(fait.observation.lieu, voisin.entiteId);
@@ -598,8 +619,8 @@ export class SNEQSystem {
   }
 
   // Entity management
-  createEntity(entity: Omit<Entity, 'id'>): Entity {
-    const id = entity.id || crypto.randomUUID();
+  createEntity(entity: Pick<Entity, 'type' | 'nom' | 'aliases'> & Partial<Omit<Entity, 'id' | 'type' | 'nom' | 'aliases'>>): Entity {
+    const id = crypto.randomUUID();
     const noeud: NoeudGCN = {
       entiteId: id,
       type: entity.type,
@@ -614,17 +635,28 @@ export class SNEQSystem {
 
     return {
       id,
+      nomConnu: false,
       ...entity,
-      dateCreation: { jour: 1, heure: 1 },
-      attributsFiges: new Map()
+      dateCreation: entity.dateCreation || { jour: 1, heure: 1 },
+      attributsFiges: entity.attributsFiges || new Map()
     };
   }
 
-  createRelation(relation: Omit<AreteGCN, 'id'>): AreteGCN {
-    const id = relation.id || `${relation.source}_${relation.cible}`;
+  createRelation(relation: {
+    source: string;
+    cible: string;
+    typeRelation: TypeRelation;
+    directionnalite?: 'UNIDIRECTIONNELLE' | 'BIDIRECTIONNELLE';
+    forcePropagation?: number;
+  }): AreteGCN {
+    const id = `${relation.source}_${relation.cible}`;
     const arete: AreteGCN = {
       id,
-      ...relation,
+      source: relation.source,
+      cible: relation.cible,
+      typeRelation: relation.typeRelation,
+      directionnalite: relation.directionnalite || 'BIDIRECTIONNELLE',
+      forcePropagation: relation.forcePropagation || 0.5,
       etatArete: 'INDEFINI',
       attributs: new Map(),
       reglesPropagation: []
@@ -632,11 +664,12 @@ export class SNEQSystem {
 
     this.gcn.ajouterArete(arete);
 
-    // Update node awareness
-    const sourceNode = this.gcn.getVoisins(relation.source);
-    const targetNode = this.gcn.getVoisins(relation.cible);
-
     return arete;
+  }
+
+  // Constraint management
+  addConstraint(entiteId: string, attribut: string, contrainte: Contrainte): void {
+    this.cp.ajouterContrainte(entiteId, attribut, contrainte);
   }
 
   // Main collapse interface

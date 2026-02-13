@@ -17,7 +17,7 @@ async function testSNEQCollapse() {
     console.log(`  Aliases: ${forgeron.aliases.join(', ')}`);
     // ==================== ADD POTENTIALITIES ====================
     // Profession (constrained by world rule)
-    sneq.cp.ajouterContrainte(forgeron.id, "profession", {
+    sneq.addConstraint(forgeron.id, "profession", {
         id: "ctr_profession",
         source: { type: 'REGLE_MONDE', regleId: "village_blacksmith" },
         dateCreation: { jour: 1, heure: 14 },
@@ -37,12 +37,13 @@ async function testSNEQCollapse() {
         nom: "Marcus",
         aliases: ["l'armurier"]
     });
-    sneq.createRelation(forgeron, {
-        categorie: 'SOCIAL',
-        sous_type: 'AMITIE',
+    sneq.createRelation({
+        source: forgeron.id,
+        cible: armurier.id,
+        typeRelation: { categorie: 'SOCIAL', sous_type: 'AMITIE' },
         forcePropagation: 0.7
     });
-    sneq.cp.ajouterContrainte(forgeron.id, "passe_militaire", {
+    sneq.addConstraint(forgeron.id, "passe_militaire", {
         id: "ctr_militaire",
         source: { type: 'RELATION', relationId: `${forgeron.id}_marcus` },
         dateCreation: { jour: 1, heure: 14 },
@@ -55,7 +56,7 @@ async function testSNEQCollapse() {
     });
     console.log(`✓ Added CONSTRAINT: passe_militaire related to Marcus's secret`);
     // Secret (unconstrained - pure potential)
-    sneq.cp.ajouterContrainte(forgeron.id, "secret_principal", {
+    sneq.addConstraint(forgeron.id, "secret_principal", {
         id: "ctr_secret",
         source: { type: 'INFERENCE_IA', confidence: 0.6 },
         dateCreation: { jour: 1, heure: 14 },
@@ -77,7 +78,7 @@ async function testSNEQCollapse() {
             methode: { type: 'DIALOGUE', pnjId: forgeron.id, ligneDialogue: "I served under the Duke" }
         },
         options: {
-            profondeur: 'DETAILLE',
+            profondeur: 'DETAILLEE',
             registre: 'DRAMATIQUE'
         }
     });
@@ -104,14 +105,14 @@ async function testSNEQCollapse() {
             methode: { type: 'DIALOGUE', pnjId: forgeron.id, ligneDialogue: "I helped them escape..." }
         },
         options: {
-            profondeur: 'DETAILLE',
+            profondeur: 'DETAILLEE',
             registre: 'SOMBRE'
         }
     });
     if (collapse2.type === 'SUCCES') {
         console.log(`\n✅ COLLAPSE: secret_principal`);
         console.log(`   Value: "${collapse2.fait.valeur}"`);
-        console.log(`   Confidence: ${collapse2.fait.valeur.confidence || 'N/A'}`);
+        console.log(`   State: FIGE (immutable)`);
         // Show how this changes future dialogue options
         console.log(`\n💡 NEW DIALOGUE OPTIONS EMERGED:`);
         console.log(`   → "Why did you help them escape?" (now valid)`);
