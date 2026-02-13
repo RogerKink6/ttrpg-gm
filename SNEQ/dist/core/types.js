@@ -3,7 +3,6 @@
 // Core Type Definitions
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SNEQSystem = exports.MoteurCollapse = exports.GrapheCoherenceNarrative = exports.ChampPotentialites = exports.RegistreCanonique = void 0;
-    | 'FIGE'; // Canonically observed, immutable
 // ==================== CANONICAL REGISTER ====================
 class RegistreCanonique {
     constructor() {
@@ -19,7 +18,8 @@ class RegistreCanonique {
         const fait = {
             cle: attribut,
             valeur,
-            observation
+            observation,
+            preuves: []
         };
         // Store
         if (!this.faits.has(entiteId)) {
@@ -75,6 +75,15 @@ class ChampPotentialites {
     getPotentialite(entiteId, attribut) {
         const cle = `${entiteId}:${attribut}`;
         return this.potentialites.get(cle) || null;
+    }
+    getTousPotentialites(entiteId) {
+        const result = [];
+        for (const potentialite of this.potentialites.values()) {
+            if (potentialite.entiteId === entiteId) {
+                result.push(potentialite);
+            }
+        }
+        return result;
     }
     convertirEnFige(entiteId, attribut) {
         const cle = `${entiteId}:${attribut}`;
@@ -158,14 +167,23 @@ class MoteurCollapse {
         }
         // 3. For now, simulate collapse (in real implementation, call LLM here)
         // This is where the AI would generate the value based on constraints
-        // 4. Create fait from generation
+        // 4. Convert DemandeCollapse observation to AttributFige observation
+        const observationFige = {
+            timestamp: demande.observation.timestamp,
+            lieu: demande.observation.lieu,
+            methode: 'DIALOGUE_DIRECT', // Default mapping from trigger
+            source: { type: 'OBSERVATION_DIRECTE' },
+            fiabilite: 'CERTAINE'
+        };
+        // 5. Create fait from generation
         const fait = {
             cle: demande.attribut,
             valeur: { type: 'STRING', valeur: 'Generated value' }, // Placeholder
-            observation: demande.observation
+            observation: observationFige,
+            preuves: []
         };
-        // 5. Inscrire dans RC
-        const inscription = this.rc.inscrireFait(demande.entiteId, demande.attribut, fait.valeur, demande.observation);
+        // 6. Inscrire dans RC
+        const inscription = this.rc.inscrireFait(demande.entiteId, demande.attribut, fait.valeur, observationFige);
         if (!inscription.succes) {
             return {
                 type: 'ECHEC',
@@ -175,9 +193,9 @@ class MoteurCollapse {
                     }]
             };
         }
-        // 6. Retirer du CP
+        // 7. Retirer du CP
         this.cp.convertirEnFige(demande.entiteId, demande.attribut);
-        // 7. Propager les contraintes
+        // 8. Propager les contraintes
         const propagation = this.propagerContraintes(fait);
         return {
             type: 'SUCCES',
@@ -192,7 +210,7 @@ class MoteurCollapse {
         const voisins = this.gcn.getVoisins(fait.observation.lieu);
         for (const voisin of voisins) {
             // Get potentialities for this neighbor
-            const potentialitesVoisin = this.cp.getTousFaits(voisin.entiteId);
+            const potentialitesVoisin = this.cp.getTousPotentialites(voisin.entiteId);
             // Add constraints based on relation type
             const arete = this.gcn.getArete(fait.observation.lieu, voisin.entiteId);
             if (arete) {
@@ -233,7 +251,7 @@ class SNEQSystem {
     }
     // Entity management
     createEntity(entity) {
-        const id = entity.id || crypto.randomUUID();
+        const id = crypto.randomUUID();
         const noeud = {
             entiteId: id,
             type: entity.type,
@@ -246,25 +264,31 @@ class SNEQSystem {
         this.gcn.ajouterNoeud(noeud);
         return {
             id,
+            nomConnu: false,
             ...entity,
-            dateCreation: { jour: 1, heure: 1 },
-            attributsFiges: new Map()
+            dateCreation: entity.dateCreation || { jour: 1, heure: 1 },
+            attributsFiges: entity.attributsFiges || new Map()
         };
     }
     createRelation(relation) {
-        const id = relation.id || `${relation.source}_${relation.cible}`;
+        const id = `${relation.source}_${relation.cible}`;
         const arete = {
             id,
-            ...relation,
+            source: relation.source,
+            cible: relation.cible,
+            typeRelation: relation.typeRelation,
+            directionnalite: relation.directionnalite || 'BIDIRECTIONNELLE',
+            forcePropagation: relation.forcePropagation || 0.5,
             etatArete: 'INDEFINI',
             attributs: new Map(),
             reglesPropagation: []
         };
         this.gcn.ajouterArete(arete);
-        // Update node awareness
-        const sourceNode = this.gcn.getVoisins(relation.source);
-        const targetNode = this.gcn.getVoisins(relation.cible);
         return arete;
+    }
+    // Constraint management
+    addConstraint(entiteId, attribut, contrainte) {
+        this.cp.ajouterContrainte(entiteId, attribut, contrainte);
     }
     // Main collapse interface
     async observe(demande) {
