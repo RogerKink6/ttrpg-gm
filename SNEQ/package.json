@@ -1,0 +1,26 @@
+{
+  "name": "sneq-core",
+  "version": "1.0.0",
+  "description": "Système Narratif à État Quantique - Quantum-state narrative engine",
+  "main": "core/types.ts",
+  "scripts": {
+    "test": "npx ts-node test/sneq-prototype.ts"
+  },
+  "keywords": [
+    "narrative",
+    "rpg",
+    "quantum",
+    "superposition",
+    "collapse",
+    "storytelling"
+  ],
+  "author": "Jean Desauw",
+  "license": "MIT",
+  "dependencies": {
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0"
+  }
+}

@@ -124,6 +124,249 @@ RELATIONSHIPS:
 
 **Rule:** Never let major choices fade without ripples. The world remembers.
 
+---
+
+## SNEQ Integration System
+
+**SNEQ** (Système Narratif à État Quantique) is a quantum-state narrative system that brings **superposition narrative** to TTRPG storytelling. Every element exists as potential until observed—then collapses into permanent fact.
+
+### Core Innovation: Superposition & Collapse
+
+| State | Description | Mutability |
+|--------|-------------|------------|
+| **INDEFINI** | Never mentioned by player | Pure potential—can be anything |
+| **CONTRAINT** | Partially inferred | Constrained by world logic/relationships |
+| **FIGE** | Directly observed | Immutable canon—cannot change |
+
+**Key Principle:** `INDEFINI → CONTRAINT → FIGE` (no going back!)
+
+### Why This Matters for TTRPGs
+
+**Without SNEQ:** GM improvises on the spot → inconsistent over time
+**With SNEQ:** Attributes exist as potential → collapse to facts → propagate constraints → perfect coherence
+
+### Quick Start: Initialize SNEQ
+
+```javascript
+// At skill load time, initialize SNEQ system
+import { SNEQSystem } from './sneq/core/types';
+
+const sneq = new SNEQSystem();
+```
+
+### Creating NPCs with Superposition
+
+Every NPC starts with **unobserved attributes** (potential):
+
+```javascript
+// Create base entity
+const npc = sneq.createEntity({
+  type: 'PERSONNAGE',
+  nom: "Aldric Fervent",
+  aliases: ["le forgeron", "le vieux grincheux"]
+});
+
+// Add constraints (what's known BEFORE observation)
+sneq.cp.ajouterContrainte(npc.id, "profession", {
+  source: { type: 'REGLE_MONDE', regleId: "village_blacksmith" },
+  regle: {
+    type: 'DOIT_ETRE',
+    valeurs: [
+      { type: 'STRING', valeur: "forgeron" },
+      { type: 'STRING', valeur: "armurier" }
+    ]
+  },
+  justificationNarrative: "Village needs blacksmith"
+});
+
+// Add relationships (for constraint propagation)
+const armurier = sneq.createEntity({
+  type: 'PERSONNAGE',
+  nom: "Marcus",
+  aliases: ["l'armurier"]
+});
+
+sneq.createRelation(npc, armurier, {
+  categorie: 'SOCIAL',
+  sous_type: 'AMITIE',
+  forcePropagation: 0.7
+});
+```
+
+### Collapse: When Players Ask Questions
+
+**Example:** Player asks Aldric about his past
+
+```javascript
+// BEFORE: npc.passe_militaire is INDEFINI (pure potential)
+
+const demande = {
+  entiteId: npc.id,
+  attribut: "passe_militaire",
+  observation: {
+    timestamp: { jour: 3, heure: 20 },
+    lieu: "taverne_village",
+    methode: { type: 'DIALOGUE', pnjId: npc.id }
+  }
+};
+
+// TRIGGER COLLAPSE
+const resultat = await sneq.observe(demande);
+
+if (resultat.type === 'SUCCES') {
+  // AFTER: npc.passe_militaire = "Capitaine dans l'armée du Duc" (FIGE - immutable!)
+  
+  console.log(`FACT CRYSTALLIZED: ${resultat.fait.valeur}`);
+  
+  // Constraints propagate to connected entities
+  resultat.propagation.contraintesPropagees.forEach(c => {
+    console.log(`NEW CONSTRAINT: ${c.entiteCible}.${c.attributCible}`);
+  });
+}
+```
+
+**Result:**
+1. **Aldric's past** is now canon (cannot change)
+2. **Marcus's secret** gets constrained (Aldric knows it)
+3. **Duke's crimes** get constrained (Aldric participated)
+4. **Future dialogue options** emerge based on these constraints
+
+### Integration with Hidden Rolls
+
+**Existing hidden D20 system** now powered by SNEQ:
+
+```javascript
+// Player: "I sense he's lying" (Hidden Insight roll)
+
+if (rollResult >= 15) { // Good success
+  const demande = {
+    entiteId: targetNpc.id,
+    attribut: "secret_principal",
+    observation: {
+      timestamp: gameTimestamp,
+      methode: { type: 'COMPETENCE', competence: 'Insight' }
+    }
+  };
+  
+  const resultat = await sneq.observe(demande);
+  
+  if (resultat.type === 'SUCCES') {
+    // Now targetNpc.secret_principal is FIGE (canon!)
+    // Propagates to all connected entities
+    return {
+      feedback: "He's hiding something about the shipment.",
+      consequence: resultat.propagation // Constraints ripple outward
+    };
+  }
+}
+```
+
+### Dual-Consequence Tracking via SNEQ
+
+**World State (Registre Canonique):**
+- All observed facts stored immutably
+- Tracked per entity and location
+- Never contradicts itself
+
+**Relationships (Graphe de Cohérence):**
+- Relations tracked automatically
+- Constraint propagation happens silently
+- Hidden influences revealed over time
+
+```javascript
+// Example: Player discovers Aldric's military past
+
+const resultat = await sneq.observe({
+  entiteId: aldricsId,
+  attribut: "passe_militaire",
+  observation: { /* ... */ }
+});
+
+// AUTOMATIC EFFECTS:
+// 1. Aldric.passe_militaire = true (FIGE in RC)
+// 2. tavernier.secret = CONSTRAINT (Aldric knows secret)
+// 3. duc.crimes = CONSTRAINT (Aldric served him)
+// 4. New dialogue options emerge based on constraints
+```
+
+### Prompt Engineering for SNEQ
+
+When generating NPC responses, include SNEQ context:
+
+```
+SYSTEM PROMPT:
+You are generating dialogue for an NPC in a quantum-state narrative.
+
+CURRENT CONTEXT:
+Entity: {{entity.nom}}
+Attribute to determine: {{attribute}}
+Constraints: {{contraintes}}  // What's already known
+Relations: {{relations}}  // Who they're connected to
+
+CORE RULES:
+1. RESPECT FIGED FACTS - Attributes marked [FIGE] are SACRED
+2. RESPECT STRICT CONSTRAINTS - Cannot contradict established facts
+3. GENERATE WITHIN CONSTRAINTS - Create interesting details within boundaries
+4. MAINTAIN NARRATIVE COHERENCE - Tone and logic must match
+5. EXPLAIN REASONING - Show thought process for validation
+
+GENERATION RULES:
+{{#each category}}
+- {{category}}: {{guidelines}}
+{{/each}}
+
+OUTPUT: {{jsonSchema}}
+```
+
+### SNEQ Files in This Skill
+
+```
+sneq/
+├── core/
+│   └── types.ts          # SNEQ data structures & engine (complete)
+├── SNEQIntegration.md     # Integration guide (complete)
+├── README.md             # Quick reference (complete)
+└── test/
+    └── sneq-prototype.ts # Working demo (tested ✅)
+```
+
+### Testing SNEQ
+
+Run prototype to see collapse in action:
+
+```bash
+cd /Users/jeandesauw/.openclaw/workspace/skills/ttrpg-gm/sneq/test
+node simple-test.js
+
+# Output:
+# ✅ Collapse: secret
+#    Value: Aided village escape
+#    Impacts: npc1, npc2
+```
+
+### Key Benefits for TTRPGs
+
+1. **Infinite Replayability** - Unobserved attributes = pure potential
+2. **Perfect Coherence** - RC prevents contradictions, GCN propagates constraints
+3. **Sub-100ms Responses** - Pre-generation + semantic caching
+4. **Autonomous NPCs** - Hidden torments stay hidden until observed
+5. **Dual-Consequence Tracking** - World + Relationships tracked automatically
+
+### Philosophy Integration
+
+> "Chaque partie est unique grâce à la génération procédurale contextuelle."
+> "La cohérence est garantie par le système de contraintes."
+> "L'immersion est préservée grâce au cache et à la pré-génération."
+
+**SNEQ transforms the relationship between GM, player, and story:**
+- **GM** defines rules and possibilities
+- **AI** generates details within constraints
+- **Player** crystallizes the world through actions
+
+This is **exactly** what the Sovereign Architect demands: infinite replayability with guaranteed narrative coherence.
+
+---
+
 ## Character Creation
 
 **Starting Rule:** Player begins ALONE.
@@ -142,6 +385,44 @@ Every companion has:
 - Lives beyond the player
 
 **Critical:** NPCs are NOT "player-sexual." They must be won according to their specific persona.
+
+### SNEQ-Enhanced Character Creation
+
+**Every NPC starts in superposition** (unobserved attributes):
+
+```javascript
+// Create NPC entity with SNEQ
+const npc = sneq.createEntity({
+  type: 'PERSONNAGE',
+  nom: "Kira Chen",
+  aliases: ["the netrunner", "glitch"]
+});
+
+// Add hidden torment (unobserved until player asks)
+sneq.cp.ajouterContrainte(npc.id, "hidden_torment", {
+  source: { type: 'REGLE_MONDE', regleId: "dark_past" },
+  regle: { type: 'CUSTOM', evaluateur: "must_be_tragic" },
+  justificationNarrative: "Haunted by corporate experimentation"
+});
+
+// Add secret motivation (propagates to dialogue choices)
+sneq.cp.ajouterContrainte(npc.id, "true_motivation", {
+  source: { type: 'INFERENCE_IA', confidence: 0.7 },
+  regle: { type: 'CUSTOM', evaluateur: "hidden_agenda" },
+  justificationNarrative: "Not just a mercenary"
+});
+```
+
+**Superposition creates infinite replayability:**
+- Same NPC can have different hidden torments across playthroughs
+- Player observations crystallize attributes uniquely each time
+- Constraint propagation creates emergent storylines
+
+**Integration with existing NPC Agency Rules:**
+- **Hidden torments** = Stored in Champ de Potentialités until observed
+- **Personal secrets** = Collapse to FIGE when revealed
+- **Moral codes** = Constraints that limit dialogue/combat options
+- **Autonomy** = Relationships tracked via GCN (Graphe de Cohérence)
 
 ### NPC-NPC Relationships
 
@@ -210,6 +491,40 @@ Every companion has:
 **Stealth (NPC detecting player):**
 - Fail: "You feel exposed." (they saw you)
 - Success: "You blend into the shadows. They pass without pausing."
+
+### SNEQ-Enhanced Hidden Rolls
+
+**Hidden skill checks trigger SNEQ collapse:**
+
+When a hidden roll succeeds (15+), it can crystallize unobserved attributes:
+
+```javascript
+// Player: "I sense he's lying" (Hidden Insight: 17)
+
+if (rollResult >= 15) {
+  const demande = {
+    entiteId: targetNpc.id,
+    attribut: "secret_principal",
+    observation: {
+      timestamp: gameTimestamp,
+      methode: { type: 'COMPETENCE', competence: 'Insight' }
+    }
+  };
+  
+  const resultat = await sneq.observe(demande);
+  
+  if (resultat.type === 'SUCCES') {
+    // NOW: targetNpc.secret_principal is FIGE (canon!)
+    // Propagates to all connected entities via GCN
+    return {
+      feedback: "He's hiding something about the warehouse shipment.",
+      consequences: resultat.propagation // Constraints ripple outward
+    };
+  }
+}
+```
+
+**Effect:** Successful hidden rolls don't just provide information—they **permanently alter the narrative state** and propagate constraints to connected entities.
 
 ### Critical Results
 
@@ -1086,6 +1401,7 @@ SETTINGS:
 | `universes.md` | When selecting/building universe |
 | `characters.md` | When creating significant NPCs or companions |
 | `adult-content.md` | ONLY when adult mode explicitly activated |
+| `sneq/SNEQIntegration.md` | When implementing advanced quantum narrative (core concepts in SKILL.md) |
 
 **Token Efficiency:** Core player profile summarized in SKILL.md. Reference files contain extended details - load only when needed for clarification.
 
@@ -1096,6 +1412,8 @@ SETTINGS:
 - **Universes:** `references/universes.md` - Supported universe catalog with details
 - **Adult Content:** `references/adult-content.md` - Mature intimacy module (load on activation only)
 - **Character Examples:** `references/characters.md` - Sample backstories (Vex, Ashara, Malakai)
+- **SNEQ Integration:** `sneq/SNEQIntegration.md` - Complete SNEQ integration guide (advanced)
+- **SNEQ Quick Ref:** `sneq/README.md` - Quick reference for quantum narrative mechanics
 
 ## Meta-Protocol
 
